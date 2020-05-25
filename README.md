@@ -9,6 +9,74 @@ Lightweight Trained Neural Network
 [scan-img]: https://scan.coverity.com/projects/9285/badge.svg
 [scan-link]: https://scan.coverity.com/projects/lwtnn-lwtnn
 
+Extension: Fittable LWTNNs
+--------------------------
+
+This fork extends LWTNN to somehow support training of networks inside the library. This was achieved by using the [autodiff-library](https://autodiff.github.io/) under the hood. For the parameter-update, a very simple SGD is used. 
+The changes are fully experimental, and at the moment only enabled for networks, not for graphs.
+
+### Changes to LWTNN core files to enable this:
+ * Most classes are now template classes, so the default numeric type `double` can now be changed to `autodiff::var`.
+   To not break the library, the templating is done with the following scheme:
+   
+   **Before:**
+   
+   ```c++
+    class Stack
+    {
+        // something with double...
+    };
+   ```
+   
+   **Now:**
+   
+   ```c++
+    template<typename T>
+    class StackT
+    {
+        // something generic
+    };
+    
+    using Stack = StackT<double>;
+   ```
+   
+   As a consequence, some `.cxx`-files are now empty, and replaced by `.txx`-files in the `include`-folder.
+   
+ * The Fitting is encapsulated in the class `FittableLWTNN`, which inherits the class `LightweightNeuralNetworkT<autodiff::var>`. To enable this, the former `private` section is now `protected`.
+   Additionally, this class is friend with the layer classes and the stack-class (is this hacky?).
+   
+ * Currently, `dynamic_cast<>` is used to get access to the layer data. This is probably hacky, but also easily to solve.
+   
+ * Because of the autodiff-library, C++17 is now required.
+   
+   
+### How to use it
+
+The interface resembles somehow the keras interface. Until now, it was only tested for simple regressions with small networks, consisting of a few dense layers.
+
+```c++
+double learning_rate = 0.01;
+std::size_t epochs = 250;
+std::size_t batch_size = 16;
+
+auto history = nn.fit(x_train, y_train, x_valid, y_valid, learning_rate, batch_size, epochs);
+```
+
+The training data can be either provided as `std::vector<ValueMap>` or as `std::vector<Eigen::VectorXvar>`.
+There is a new test-binary called `"test-fittable-networks"`, which demonstrates the use of `FittableLWTNN`.
+
+
+### Issues
+* no graphs supported
+* many compiler warnings (but also because of autodiff...)
+* very experimental state and poor testing
+* a bit hacky approach with `friend` and `dynamic_cast<>` (need of proper getters/setters...)
+* performance for larger networks not very good. This is not much investigated, just some attempts with OpenMP were tried...
+
+
+What follows now is the original readme.
+   
+
 What is this?
 -------------
 

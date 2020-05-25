@@ -2,6 +2,9 @@
 # Set the minimum CMake version required to build the project.
 cmake_minimum_required( VERSION 3.1 )
 
+# TODO fix this! but currently other problems...
+add_definitions("-Wno-deprecated-copy")
+
 # Silence some warnings on macOS with new CMake versions.
 if( NOT ${CMAKE_VERSION} VERSION_LESS 3.9 )
    cmake_policy( SET CMP0068 NEW )
@@ -14,9 +17,9 @@ project( lwtnn VERSION 2.10 )
 include( CTest )
 
 # Set up the "C++ version" to use.
-set( CMAKE_CXX_STANDARD_REQUIRED 11 CACHE STRING
+set( CMAKE_CXX_STANDARD_REQUIRED 17 CACHE STRING
    "Minimum C++ standard required for the build" )
-set( CMAKE_CXX_STANDARD 11 CACHE STRING
+set( CMAKE_CXX_STANDARD 17 CACHE STRING
    "C++ standard to use for the build" )
 set( CMAKE_CXX_EXTENSIONS FALSE CACHE BOOL
    "(Dis)allow using compiler extensions" )
@@ -49,6 +52,7 @@ list( INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/cmake )
 # available on the build system, or downloading the necessary code as part
 # of the build of this project.
 
+
 # Figure out what to do with Boost.
 option( BUILTIN_BOOST "Acquire Boost as part of building this project" OFF )
 if( BUILTIN_BOOST )
@@ -78,6 +82,7 @@ else()
    find_package( Boost 1.54.0 REQUIRED )
 endif()
 
+
 # Figure out what to do with Eigen.
 option( BUILTIN_EIGEN "Acquire Eigen as part of building this project" OFF )
 if( BUILTIN_EIGEN )
@@ -105,27 +110,50 @@ else()
    find_package( Eigen3 REQUIRED )
 endif()
 
+
+# Copied from above, autodiff must be downloaded as part of the project:
+include( ExternalProject )
+ExternalProject_Add( autodiff
+    PREFIX ${CMAKE_BINARY_DIR}/externals
+    INSTALL_DIR ${CMAKE_BINARY_DIR}/externals/autodiff
+    GIT_REPOSITORY https://github.com/autodiff/autodiff/
+    CMAKE_CACHE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+)
+# The autodiff headers are needed by clients of this project as well, so let's
+# install them with the project.
+install( DIRECTORY ${CMAKE_BINARY_DIR}/externals/autodiff/
+    DESTINATION . USE_SOURCE_PERMISSIONS )
+# Set the include path to use.
+set( AUTODIFF_INCLUDE_DIR
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/externals/autodiff/include>
+    $<INSTALL_INTERFACE:include/autodiff> )
+# Tell the user what will happen.
+message( STATUS "Downloaded autodiff library to ${CMAKE_BINARY_DIR}/externals/autodiffs" )
+
+
 # Public header files for the shared/static library.
 set( lib_headers include/lwtnn/Exceptions.hh include/lwtnn/Graph.hh
    include/lwtnn/InputPreprocessor.hh include/lwtnn/LightweightGraph.hh
    include/lwtnn/LightweightNeuralNetwork.hh include/lwtnn/NNLayerConfig.hh
    include/lwtnn/NanReplacer.hh include/lwtnn/Source.hh include/lwtnn/Stack.hh
    include/lwtnn/Stack.hh include/lwtnn/lightweight_network_config.hh
-   include/lwtnn/lightweight_nn_streamers.hh include/lwtnn/parse_json.hh )
+   include/lwtnn/lightweight_nn_streamers.hh include/lwtnn/parse_json.hh include/lwtnn/FittableLWTNN.hh )
 # Source files for the shared/static library.
 set( lib_sources src/Exceptions.cxx src/Graph.cxx src/InputPreprocessor.cxx
    src/LightweightGraph.cxx src/LightweightNeuralNetwork.cxx src/NanReplacer.cxx
    src/Stack.cxx src/lightweight_nn_streamers.cxx src/parse_json.cxx
-   src/test_utilities.hh src/test_utilities.cxx )
+   src/test_utilities.hh src/test_utilities.cxx src/FittableLWTNN.cxx )
 
+   
 # Build the shared library.
 add_library( lwtnn SHARED ${lib_headers} ${lib_sources} )
 target_include_directories( lwtnn
-   PUBLIC ${EIGEN3_INCLUDE_DIR}
+   PUBLIC ${EIGEN3_INCLUDE_DIR} ${AUTODIFF_INCLUDE_DIR}
    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
    PRIVATE ${Boost_INCLUDE_DIRS} )
 set_property( TARGET lwtnn
    PROPERTY PUBLIC_HEADER ${lib_headers} )
+add_dependencies( lwtnn autodiff )
 if( BUILTIN_BOOST )
    add_dependencies( lwtnn Boost )
 endif()
@@ -133,20 +161,29 @@ if( BUILTIN_EIGEN )
    add_dependencies( lwtnn Eigen )
 endif()
 
+
 # Build the static library.
 add_library( lwtnn-stat ${lib_headers} ${lib_sources} )
 target_include_directories( lwtnn-stat
-   PUBLIC ${EIGEN3_INCLUDE_DIR}
+   PUBLIC ${EIGEN3_INCLUDE_DIR} ${AUTODIFF_INCLUDE_DIR}
    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
    PRIVATE ${Boost_INCLUDE_DIRS} )
 set_property( TARGET lwtnn-stat
    PROPERTY PUBLIC_HEADER ${lib_headers} )
+add_dependencies( lwtnn-stat autodiff )
 if( BUILTIN_BOOST )
    add_dependencies( lwtnn-stat Boost )
 endif()
 if( BUILTIN_EIGEN )
    add_dependencies( lwtnn-stat Eigen )
 endif()
+
+
+# OPEN MP
+find_package(OpenMP REQUIRED)
+target_link_libraries(lwtnn PUBLIC OpenMP::OpenMP_CXX)
+target_link_libraries(lwtnn-stat PUBLIC OpenMP::OpenMP_CXX)
+
 
 # Install the libraries.
 install( TARGETS lwtnn lwtnn-stat
@@ -155,6 +192,7 @@ install( TARGETS lwtnn lwtnn-stat
    LIBRARY DESTINATION lib
    PUBLIC_HEADER DESTINATION include/lwtnn )
 
+   
 # Helper macro for building the projects' executables.
 macro( lwtnn_add_executable name )
    # Declare the executable.
@@ -168,6 +206,7 @@ macro( lwtnn_add_executable name )
       RUNTIME DESTINATION bin )
 endmacro( lwtnn_add_executable )
 
+
 # Build/install all executables of the project.
 lwtnn_add_executable( lwtnn-benchmark-rnn )
 lwtnn_add_executable( lwtnn-dump-config )
@@ -175,6 +214,7 @@ lwtnn_add_executable( lwtnn-test-arbitrary-net )
 lwtnn_add_executable( lwtnn-test-graph )
 lwtnn_add_executable( lwtnn-test-lightweight-graph )
 lwtnn_add_executable( lwtnn-test-rnn )
+
 
 # Install the converter scripts.
 install( FILES
@@ -189,6 +229,7 @@ install( PROGRAMS
    converters/sklearn2json.py
    DESTINATION converters )
 
+   
 # Helper macro for building the project's unit tests.
 macro( lwtnn_add_test name )
    # Build the unit-test executable:
@@ -202,8 +243,11 @@ macro( lwtnn_add_test name )
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test-bin )
 endmacro( lwtnn_add_test )
 
+
 # Set up the test(s) of the project.
 lwtnn_add_test( test-nn-streamers tests/test-nn-streamers.cxx )
+lwtnn_add_test( test-fittable-networks tests/fittable_networks/test_fittable_networks.cxx )
+configure_file( tests/fittable_networks/simple_lwtnn_network.json ${CMAKE_BINARY_DIR}/test-bin/simple_lwtnn_network.json COPYONLY)
 
 # Install the CMake description of the project.
 install( EXPORT lwtnnTargets
