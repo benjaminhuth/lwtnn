@@ -9,13 +9,6 @@
 #include <lwtnn/FittableLWTNN.hh>
 #include <lwtnn/parse_json.hh>
 
-#if __has_include(<sfplot.hpp>)
-#define HAS_SFPLOT
-#include <sfplot.hpp>
-#endif
-
-#include <mcl/mcl_python_like.hpp>
-
 // global random stuff for convenience
 std::mt19937 gen( (std::random_device())() );
 std::uniform_real_distribution<double> dist(-3.0, 3.0);
@@ -51,7 +44,7 @@ int main(int argc, char **argv)
     std::ifstream input_file("./simple_lwtnn_network.json");
     
     if (!input_file.is_open())
-        throw std::runtime_error("could not open file 'simple_lwtnn_network.json'");
+        throw std::runtime_error("could not open file 'simple_lwtnn_network.json'. Run 'keras_network.py' to create it!");
     
     auto parsed = lwt::parse_json(input_file);
         
@@ -70,17 +63,19 @@ int main(int argc, char **argv)
     auto t0 = std::chrono::high_resolution_clock::now();
     auto history = nn.fit(x_train, y_train, x_test, y_test, learning_rate, batch_size, epochs);
     auto t1 = std::chrono::high_resolution_clock::now();
-    std::cout << "fit took " << std::chrono::duration<double>(t1-t0).count() << std::endl;
+    std::cout << "fit took " << std::chrono::duration<double>(t1-t0).count() << " seconds" << std::endl;
     
-#ifdef HAS_SFPLOT
-    sfplot::plot my_plot;
-    my_plot.add_line_plot(history.valid_score, sf::Color::Blue, "validation");
-    my_plot.add_line_plot(history.train_score, sf::Color::Red, "training");
-    my_plot.show();
-#endif
+    std::vector<int> epoch_vec(history.train_losses.size());
+    std::iota(epoch_vec.begin(), epoch_vec.end(),1);
+    
+    std::cout << "R2 train:      " << history.train_score.back() << std::endl;
+    std::cout << "R2 validation: " << history.valid_score.back() << std::endl;
       
-    for( auto [x, y] : mc::zip(x_test, y_test) )
+    for( std::size_t i=0; i<x_test.size(); ++i )
     {
+        const auto &x = x_test[i];
+        const auto &y = y_test[i];
+        
         std::map< std::string, double > nn_inputs;
         
         nn_inputs["x1"] = static_cast<double>(x[0]);

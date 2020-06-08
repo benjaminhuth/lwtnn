@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import numpy as np
 
@@ -13,6 +14,16 @@ from tensorflow.keras.initializers import *
 from tensorflow.keras.optimizers import *
 
 import matplotlib.pyplot as plt
+
+path_to_converter = os.path.abspath("../lwtnn/converters/keras2json.py")
+
+if len(sys.argv) > 1:
+    path_to_converter = sys.argv[1]
+       
+
+if not os.path.exists(path_to_converter):
+    print("could not found keras2json.py. Try to give it as cmd parameter")
+    exit(1)
 
 def f(x):
     return np.cos(x[0] + x[1]) # * np.sin(x[0] - x[1])**2
@@ -84,9 +95,9 @@ with open('model_arch.json', 'w') as architecture_file:
     
 model.save_weights('model_weights.h5')
 
-out = subprocess.check_output(["../lwtnn/converters/keras2json.py", "model_arch.json", "var_spec.json", "model_weights.h5"]).decode('UTF-8')
+out = subprocess.check_output([path_to_converter, "model_arch.json", "var_spec.json", "model_weights.h5"]).decode('UTF-8')
 
-with open('../lwtnn_test/simple_lwtnn_network.json', 'w') as lwtnn_file:
+with open('simple_lwtnn_network.json', 'w') as lwtnn_file:
     lwtnn_file.write(out)
 
 history = model.fit(

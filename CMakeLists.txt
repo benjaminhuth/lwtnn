@@ -247,7 +247,8 @@ endmacro( lwtnn_add_test )
 # Set up the test(s) of the project.
 lwtnn_add_test( test-nn-streamers tests/test-nn-streamers.cxx )
 lwtnn_add_test( test-fittable-networks tests/fittable_networks/test_fittable_networks.cxx )
-configure_file( tests/fittable_networks/simple_lwtnn_network.json ${CMAKE_BINARY_DIR}/test-bin/simple_lwtnn_network.json COPYONLY)
+configure_file( tests/fittable_networks/keras_network.py ${CMAKE_BINARY_DIR}/test-bin/keras_network.py COPYONLY)
+configure_file( tests/fittable_networks/var_spec.json ${CMAKE_BINARY_DIR}/test-bin/var_spec.json COPYONLY)
 
 # Install the CMake description of the project.
 install( EXPORT lwtnnTargets
