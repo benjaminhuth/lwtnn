@@ -148,11 +148,11 @@ namespace lwt
         {
             auto [ptr, size] = m_variables[i];
             
-            for(auto i=0ul; i<size; ++i)
+            for(auto j=0ul; j<size; ++j)
             {
-                auto dL_dw = autodiff::derivatives(loss, autodiff::wrt(ptr[i]))[0];
+                auto dL_dw = autodiff::derivatives(loss, autodiff::wrt(ptr[j]))[0];
                 
-                ptr[i] = static_cast<double>(ptr[i]) - learning_rate * dL_dw;
+                ptr[j] = static_cast<double>(ptr[j]) - learning_rate * dL_dw;
             }
         }
     }
